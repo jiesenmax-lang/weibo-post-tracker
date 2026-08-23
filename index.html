@@ -260,6 +260,7 @@
       <button type="button" class="ghost" onclick="allPlus(-1)">全部 -1</button>
       <button type="button" class="danger" onclick="resetToday()">重置今天</button>
       <button type="button" class="danger" onclick="clearAllTargets()">清空目标</button>
+      <button type="button" class="ghost" id="restoreBackupBtn" onclick="restoreFromBackup()" style="display:none">恢复备份</button>
     </div>
 
     <div class="actions">
@@ -303,6 +304,7 @@
 
   <script>
     const STORAGE_KEY = 'weibo_post_tracker_v1';
+    const BACKUP_KEY = 'weibo_post_tracker_backup_v1';
     const ENDPOINT_KEY = 'weibo_tracker_endpoint';
     const DEFAULT_ENDPOINT = 'https://charitable-configurations-dominant-pmid.trycloudflare.com';
 
@@ -418,12 +420,32 @@
     }
 
     function clearAllTargets() {
-      if (!confirm('确定清空所有账号的目标条数吗？')) return;
+      if (!confirm('确定清空所有账号的目标条数吗？\n（会先自动备份当前数据，可一键恢复）')) return;
+      localStorage.setItem(BACKUP_KEY, JSON.stringify(state));
       state.accounts.forEach(acc => {
         acc.target = 0;
-        acc.completed[state.date] = 0;
       });
       saveState();
+      updateRestoreBtn();
+    }
+
+    function restoreFromBackup() {
+      const raw = localStorage.getItem(BACKUP_KEY);
+      if (!raw) return;
+      if (!confirm('确定恢复到上次「清空目标」前的数据吗？')) return;
+      try {
+        state = JSON.parse(raw);
+        saveState();
+        updateRestoreBtn();
+      } catch (e) {
+        alert('备份数据损坏，无法恢复');
+      }
+    }
+
+    function updateRestoreBtn() {
+      const btn = document.getElementById('restoreBackupBtn');
+      if (!btn) return;
+      btn.style.display = localStorage.getItem(BACKUP_KEY) ? '' : 'none';
     }
 
     function setSort(mode) {
@@ -691,6 +713,7 @@
       document.getElementById('autoSync').checked = autoSyncEnabled();
       document.getElementById('endpointInput').value = getEndpoint();
       render();
+      updateRestoreBtn();
       pullCloud(true);
     })();
   </script>
