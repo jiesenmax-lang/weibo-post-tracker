@@ -258,6 +258,13 @@
     <button type="button" class="danger" onclick="resetToday()">重置今天</button>
   </div>
 
+  <div class="actions">
+    <span style="align-self:center;font-size:.85rem;color:var(--muted)">排序</span>
+    <button type="button" id="sortName" class="accent" onclick="setSort('name')">按名称</button>
+    <button type="button" id="sortDone" class="ghost" onclick="setSort('done')">按完成任务</button>
+    <label class="sync-check"><input type="checkbox" id="hideDone" onchange="toggleHideDone(this.checked)" /> 仅看未完成</label>
+  </div>
+
   <div class="sync-panel">
     <div class="sync-row">
       <strong>云同步（手机/电脑一致，无需令牌）</strong>
@@ -309,12 +316,14 @@
           if (parsed.accounts && Array.isArray(parsed.accounts)) {
             return {
               date: parsed.date || todayStr(),
-              accounts: parsed.accounts
+              accounts: parsed.accounts,
+              sortMode: parsed.sortMode === 'done' ? 'done' : 'name',
+              hideDone: !!parsed.hideDone
             };
           }
         }
       } catch (e) { console.error(e); }
-      return { date: todayStr(), accounts: defaultAccounts.map(a => ({ ...a, completed: {} })) };
+      return { date: todayStr(), accounts: defaultAccounts.map(a => ({ ...a, completed: {} })), sortMode: 'name', hideDone: false };
     }
 
     function saveState() {
@@ -391,6 +400,16 @@
       saveState();
     }
 
+    function setSort(mode) {
+      state.sortMode = mode === 'done' ? 'done' : 'name';
+      saveState();
+    }
+
+    function toggleHideDone(c) {
+      state.hideDone = !!c;
+      saveState();
+    }
+
     function exportData() {
       const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -450,6 +469,10 @@
     function render() {
       document.getElementById('datePicker').value = state.date;
       renderSummary();
+      document.getElementById('sortName').className = state.sortMode === 'name' ? 'accent' : 'ghost';
+      document.getElementById('sortDone').className = state.sortMode === 'done' ? 'accent' : 'ghost';
+      document.getElementById('hideDone').checked = state.hideDone;
+
       const container = document.getElementById('accounts');
       if (state.accounts.length === 0) {
         container.innerHTML = '';
@@ -458,7 +481,25 @@
       }
       document.getElementById('empty').style.display = 'none';
 
-      container.innerHTML = state.accounts.map(acc => {
+      let list = state.accounts.slice();
+      if (state.hideDone) {
+        list = list.filter(a => getCompleted(a, state.date) < (Number(a.target) || 0));
+      }
+      list.sort((a, b) => {
+        const ta = Number(a.target) || 0, tb = Number(b.target) || 0;
+        const da = getCompleted(a, state.date), db = getCompleted(b, state.date);
+        const aDone = ta > 0 && da >= ta, bDone = tb > 0 && db >= tb;
+        if (aDone !== bDone) return aDone ? 1 : -1;
+        if (state.sortMode === 'name') return a.name.localeCompare(b.name, 'zh-Hans-CN');
+        return db - da;
+      });
+
+      if (list.length === 0) {
+        container.innerHTML = '<div class="empty">当前筛选下没有账号（都已完成）</div>';
+        return;
+      }
+
+      container.innerHTML = list.map(acc => {
         const target = Number(acc.target) || 0;
         const done = getCompleted(acc, state.date);
         const remain = Math.max(0, target - done);
