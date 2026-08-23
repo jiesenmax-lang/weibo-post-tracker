@@ -259,6 +259,7 @@
       <button type="button" class="ghost" onclick="allPlus(1)">全部 +1</button>
       <button type="button" class="ghost" onclick="allPlus(-1)">全部 -1</button>
       <button type="button" class="danger" onclick="resetToday()">重置今天</button>
+      <button type="button" class="ghost" onclick="setBatchTarget()">批量设置目标</button>
       <button type="button" class="danger" onclick="clearAllTargets()">清空目标</button>
       <button type="button" class="ghost" id="restoreBackupBtn" onclick="restoreFromBackup()" style="display:none">恢复备份</button>
     </div>
@@ -424,6 +425,25 @@
       localStorage.setItem(BACKUP_KEY, JSON.stringify(state));
       state.accounts.forEach(acc => {
         acc.target = 0;
+      });
+      saveState();
+      updateRestoreBtn();
+    }
+
+    function setBatchTarget() {
+      const input = prompt('请输入要批量设置的目标条数（将应用到所有账号）：', '');
+      if (input === null) return;
+      const n = Number(input);
+      if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
+        alert('请输入有效的非负整数');
+        return;
+      }
+      if (!confirm('确定将所有账号的目标设置为 ' + n + ' 条吗？\n（会先自动备份当前数据，可一键恢复）')) return;
+      localStorage.setItem(BACKUP_KEY, JSON.stringify(state));
+      state.accounts.forEach(acc => {
+        acc.target = n;
+        const cur = getCompleted(acc, state.date);
+        if (cur > n) acc.completed[state.date] = n;
       });
       saveState();
       updateRestoreBtn();
