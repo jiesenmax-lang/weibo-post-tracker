@@ -41,7 +41,7 @@
       align-items: center;
       flex-wrap: wrap;
     }
-    input[type="date"], input[type="number"], input[type="text"], input[type="file"] {
+    input[type="date"], input[type="number"], input[type="text"], input[type="url"], input[type="file"] {
       border: 1px solid #cccccc;
       border-radius: 6px;
       padding: 8px 10px;
@@ -97,52 +97,29 @@
       gap: 8px;
       margin-bottom: 14px;
     }
-    .summary .card:nth-child(3) {
-      background: #fff4e5;
-      border: 2px solid #ffb74d;
+    .sync-panel {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow);
     }
-    .summary .card:nth-child(3) .num { color: #e65100; }
-    .summary .card:nth-child(4) .num { color: var(--primary); }
+    .sync-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .sync-row strong { font-size: 0.95rem; }
+    .sync-check { font-size: 0.85rem; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+    .sync-panel input[type="url"] { flex: 1; min-width: 200px; }
     .account-row {
       background: var(--card);
       border-radius: 12px;
       padding: 12px;
       margin-bottom: 12px;
       box-shadow: var(--shadow);
-      border-left: 4px solid var(--primary);
-    }
-    .account-row.complete {
-      border-left-color: var(--success);
-    }
-    .account-row.incomplete {
-      border-left-color: var(--accent);
-    }
-    .remain {
-      background: #fff1f0;
-      border-radius: 999px;
-      padding: 5px 9px;
-      font-weight: 700;
-      font-size: 0.95rem;
-      color: var(--danger);
-      white-space: nowrap;
-    }
-    .remain.ok {
-      background: #edf8ee;
-      color: var(--success);
-    }
-    .progress-line {
-      height: 6px;
-      background: #edf0f3;
-      border-radius: 999px;
-      overflow: hidden;
-      margin-top: 10px;
-    }
-    .progress-line > span {
-      display: block;
-      height: 100%;
-      background: linear-gradient(90deg, var(--primary), var(--accent));
-      border-radius: inherit;
-      transition: width 0.15s ease;
     }
     .row-head {
       display: flex;
@@ -163,6 +140,13 @@
       flex: 1;
       flex-wrap: wrap;
     }
+    .remain {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--danger);
+      white-space: nowrap;
+    }
+    .remain.ok { color: var(--success); }
     .rate { color: var(--muted); font-size: 0.85rem; }
     .ctrl-group {
       display: inline-flex;
@@ -274,34 +258,47 @@
     <button type="button" class="danger" onclick="resetToday()">重置今天</button>
   </div>
 
+  <div class="sync-panel">
+    <div class="sync-row">
+      <strong>云同步（手机/电脑一致，无需令牌）</strong>
+      <label class="sync-check"><input type="checkbox" id="autoSync" onchange="toggleAutoSync(this.checked)" /> 自动同步</label>
+    </div>
+    <div class="sync-row">
+      <input type="url" id="endpointInput" placeholder="同步地址（cloudflared 公网地址）" />
+      <button onclick="saveEndpoint()">保存地址</button>
+      <button class="accent" onclick="pullCloud(false)">拉取</button>
+      <button class="accent" onclick="pushCloudManual()">上传</button>
+    </div>
+    <div class="hint" id="syncStatus">未设置同步地址。</div>
+  </div>
+
   <div id="accounts"></div>
   <div id="empty" class="empty" style="display:none">还没有账号，点击右上角“添加账号”开始。</div>
 
   <div class="hint">
-    操作说明：每个账号右侧的橙色格子代表已完成，灰色格子代表未完成；点击任意格子可直接把完成数设到该位置。加减按钮用于快速调整。数据自动保存在浏览器本地，导出备份可防止丢失。
+    操作说明：每个账号右侧的橙色格子代表已完成，灰色格子代表未完成；点击任意格子可直接把完成数设到该位置。加减按钮用于快速调整。<br />
+    云同步：数据通过本机 cloudflared 隧道共享，手机和电脑打开本页即自动同步，无需输入任何令牌。若同步地址失效（重启隧道会变），在上方重新填写新地址即可。<br />
+    数据同时自动保存在浏览器本地，导出备份可防止丢失。
   </div>
 
   <script>
     const STORAGE_KEY = 'weibo_post_tracker_v1';
+    const ENDPOINT_KEY = 'weibo_tracker_endpoint';
+    const DEFAULT_ENDPOINT = 'https://charitable-configurations-dominant-pmid.trycloudflare.com';
 
-    const initialDate = '2026-08-23';
     const defaultAccounts = [
-      { id: 'a1', name: '甜崽', target: 6, completed: { [initialDate]: 3 } },
-      { id: 'a2', name: '悦色', target: 13, completed: { [initialDate]: 1 } },
-      { id: 'a3', name: '苏城', target: 4, completed: { [initialDate]: 1 } },
-      { id: 'a4', name: 'star', target: 6, completed: { [initialDate]: 1 } },
-      { id: 'a5', name: 'codehive', target: 4, completed: { [initialDate]: 1 } },
-      { id: 'a6', name: '酸酸', target: 4, completed: { [initialDate]: 0 } }
+      { id: 'a1', name: '甜崽', target: 6, completed: {} },
+      { id: 'a2', name: '悦色', target: 13, completed: {} },
+      { id: 'a3', name: '苏城', target: 4, completed: {} },
+      { id: 'a4', name: 'star', target: 6, completed: {} },
+      { id: 'a5', name: 'codehive', target: 4, completed: {} },
+      { id: 'a6', name: '酸酸', target: 4, completed: {} }
     ];
 
     let state = loadState();
 
     function todayStr() {
-      const d = new Date();
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${day}`;
+      return new Date().toISOString().slice(0, 10);
     }
 
     function loadState() {
@@ -317,12 +314,17 @@
           }
         }
       } catch (e) { console.error(e); }
-      return { date: initialDate, accounts: defaultAccounts.map(a => ({ ...a, completed: { ...a.completed } })) };
+      return { date: todayStr(), accounts: defaultAccounts.map(a => ({ ...a, completed: {} })) };
     }
 
     function saveState() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       render();
+      schedulePush();
+    }
+
+    function saveLocalOnly() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     }
 
     function getCompleted(account, date) {
@@ -344,7 +346,7 @@
     function changeDate(delta) {
       const d = new Date(state.date + 'T00:00:00');
       d.setDate(d.getDate() + delta);
-      setDate(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+      setDate(d.toISOString().slice(0, 10));
     }
 
     function addAccount(name, target) {
@@ -514,7 +516,80 @@
       return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
     }
 
-    render();
+    /* ---------- 云同步（cloudflared 隧道，无需令牌） ---------- */
+    function getEndpoint() {
+      return localStorage.getItem(ENDPOINT_KEY) || DEFAULT_ENDPOINT;
+    }
+    function autoSyncEnabled() {
+      return localStorage.getItem('weibo_tracker_autosync') !== '0';
+    }
+    function setSyncStatus(msg, isErr) {
+      const el = document.getElementById('syncStatus');
+      el.textContent = msg;
+      el.style.color = isErr ? 'var(--danger)' : 'var(--muted)';
+    }
+    function saveEndpoint() {
+      const v = document.getElementById('endpointInput').value.trim().replace(/\/+$/, '');
+      if (!v) { alert('请输入同步地址'); return; }
+      localStorage.setItem(ENDPOINT_KEY, v);
+      setSyncStatus('地址已保存，正在拉取...');
+      pullCloud(true);
+    }
+    function toggleAutoSync(c) {
+      localStorage.setItem('weibo_tracker_autosync', c ? '1' : '0');
+      setSyncStatus(c ? '已开启自动同步' : '已关闭自动同步');
+    }
+    let pushTimer = null;
+    function schedulePush() {
+      if (!autoSyncEnabled()) return;
+      clearTimeout(pushTimer);
+      pushTimer = setTimeout(() => {
+        pushCloud().catch(e => setSyncStatus('自动同步失败: ' + e.message, true));
+      }, 800);
+    }
+    async function pushCloud() {
+      const ep = getEndpoint();
+      setSyncStatus('上传中...');
+      const res = await fetch(ep + '/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(state)
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      setSyncStatus('已同步 ' + new Date().toLocaleTimeString());
+    }
+    async function pushCloudManual() {
+      try { await pushCloud(); }
+      catch (e) { setSyncStatus('上传失败: ' + e.message, true); }
+    }
+    async function pullCloud(silent) {
+      const ep = getEndpoint();
+      if (!silent) setSyncStatus('拉取中...');
+      try {
+        const res = await fetch(ep + '/state');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const d = await res.json();
+        if (d && Array.isArray(d.accounts)) {
+          state = d;
+          if (!state.date) state.date = todayStr();
+          saveLocalOnly();
+          render();
+          setSyncStatus('已拉取 ' + new Date().toLocaleTimeString());
+        } else if (!silent) {
+          setSyncStatus('云端还没有数据', true);
+        }
+      } catch (e) {
+        if (!silent) setSyncStatus('拉取失败: ' + e.message, true);
+      }
+    }
+
+    /* ---------- 初始化 ---------- */
+    (function init() {
+      document.getElementById('autoSync').checked = autoSyncEnabled();
+      document.getElementById('endpointInput').value = getEndpoint();
+      render();
+      pullCloud(true);
+    })();
   </script>
 </body>
 </html>
