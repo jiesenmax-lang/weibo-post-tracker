@@ -259,6 +259,7 @@
       <button type="button" class="ghost" onclick="allPlus(1)">全部 +1</button>
       <button type="button" class="ghost" onclick="allPlus(-1)">全部 -1</button>
       <button type="button" class="danger" onclick="resetToday()">重置今天</button>
+      <button type="button" class="danger" onclick="clearAllTargets()">清空目标</button>
     </div>
 
     <div class="actions">
@@ -411,6 +412,15 @@
     function resetToday() {
       if (!confirm('确定重置今天的所有完成数吗？')) return;
       state.accounts.forEach(acc => {
+        acc.completed[state.date] = 0;
+      });
+      saveState();
+    }
+
+    function clearAllTargets() {
+      if (!confirm('确定清空所有账号的目标条数吗？')) return;
+      state.accounts.forEach(acc => {
+        acc.target = 0;
         acc.completed[state.date] = 0;
       });
       saveState();
