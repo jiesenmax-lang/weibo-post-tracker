@@ -114,6 +114,10 @@
     .sync-row strong { font-size: 0.95rem; }
     .sync-check { font-size: 0.85rem; color: var(--muted); display: flex; align-items: center; gap: 4px; }
     .sync-panel input[type="url"] { flex: 1; min-width: 200px; }
+    .sync-header { justify-content: space-between; flex-wrap: nowrap; }
+    .sync-body { display: none; }
+    .sync-body.expanded { display: block; }
+    #syncStatusCompact { font-size: 0.75rem; }
     .account-row {
       background: var(--card);
       border-radius: 12px;
@@ -266,17 +270,25 @@
   </div>
 
   <div class="sync-panel">
-    <div class="sync-row">
+    <div class="sync-row sync-header">
       <strong>云同步（手机/电脑一致，无需令牌）</strong>
-      <label class="sync-check"><input type="checkbox" id="autoSync" onchange="toggleAutoSync(this.checked)" /> 自动同步</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="hint" id="syncStatusCompact" style="margin-top:0"></span>
+        <button type="button" id="syncToggle" class="ghost" onclick="toggleSyncPanel()">展开</button>
+      </div>
     </div>
-    <div class="sync-row">
-      <input type="url" id="endpointInput" placeholder="同步地址（cloudflared 公网地址）" />
-      <button onclick="saveEndpoint()">保存地址</button>
-      <button class="accent" onclick="pullCloud(false)">拉取</button>
-      <button class="accent" onclick="pushCloudManual()">上传</button>
+    <div id="syncBody" class="sync-body">
+      <div class="sync-row">
+        <label class="sync-check"><input type="checkbox" id="autoSync" onchange="toggleAutoSync(this.checked)" /> 自动同步</label>
+      </div>
+      <div class="sync-row">
+        <input type="url" id="endpointInput" placeholder="同步地址（cloudflared 公网地址）" />
+        <button onclick="saveEndpoint()">保存地址</button>
+        <button class="accent" onclick="pullCloud(false)">拉取</button>
+        <button class="accent" onclick="pushCloudManual()">上传</button>
+      </div>
+      <div class="hint" id="syncStatus">未设置同步地址。</div>
     </div>
-    <div class="hint" id="syncStatus">未设置同步地址。</div>
   </div>
 
   <div id="accounts"></div>
@@ -568,6 +580,28 @@
       const el = document.getElementById('syncStatus');
       el.textContent = msg;
       el.style.color = isErr ? 'var(--danger)' : 'var(--muted)';
+      const compact = document.getElementById('syncStatusCompact');
+      if (compact) {
+        compact.textContent = msg;
+        compact.style.color = isErr ? 'var(--danger)' : 'var(--muted)';
+      }
+    }
+
+    const SYNC_COLLAPSED_KEY = 'weibo_tracker_sync_collapsed';
+    function isSyncCollapsed() {
+      const v = localStorage.getItem(SYNC_COLLAPSED_KEY);
+      return v === null ? true : v === '1';
+    }
+    function toggleSyncPanel() {
+      localStorage.setItem(SYNC_COLLAPSED_KEY, isSyncCollapsed() ? '0' : '1');
+      applySyncCollapsed();
+    }
+    function applySyncCollapsed() {
+      const collapsed = isSyncCollapsed();
+      const body = document.getElementById('syncBody');
+      if (body) body.classList.toggle('expanded', !collapsed);
+      const btn = document.getElementById('syncToggle');
+      if (btn) btn.textContent = collapsed ? '展开' : '收起';
     }
     function saveEndpoint() {
       const v = document.getElementById('endpointInput').value.trim().replace(/\/+$/, '');
@@ -626,6 +660,7 @@
 
     /* ---------- 初始化 ---------- */
     (function init() {
+      applySyncCollapsed();
       document.getElementById('autoSync').checked = autoSyncEnabled();
       document.getElementById('endpointInput').value = getEndpoint();
       render();
