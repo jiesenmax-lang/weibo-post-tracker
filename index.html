@@ -316,8 +316,12 @@
 
     let state = loadState();
 
+    function fmtLocalDate(d) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
     function todayStr() {
-      return new Date().toISOString().slice(0, 10);
+      return fmtLocalDate(new Date());
     }
 
     function loadState() {
@@ -365,9 +369,9 @@
     }
 
     function changeDate(delta) {
-      const d = new Date(state.date + 'T00:00:00');
-      d.setDate(d.getDate() + delta);
-      setDate(d.toISOString().slice(0, 10));
+      const parts = state.date.split('-').map(Number);
+      const d = new Date(parts[0], parts[1] - 1, parts[2] + delta);
+      setDate(fmtLocalDate(d));
     }
 
     function addAccount(name, target) {
